@@ -28,9 +28,9 @@ RUN mkdir -p web/dist && \
       '<body><h1>Dashboard</h1></body></html>' \
       > web/dist/index.html
 
-RUN --mount=type=cache,id=clawdbot-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=clawdbot-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=clawdbot-target,target=/app/target,sharing=locked \
+RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
     cargo build --release --features memory-postgres && \
     cp target/release/zeroclaw /app/zeroclaw && \
     strip /app/zeroclaw

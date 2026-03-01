@@ -21,6 +21,10 @@ jobs:
           git clone --depth 1 --branch "$ZEROCLAW_VERSION" \
             https://github.com/zeroclaw-labs/zeroclaw.git zeroclaw
 
+      - name: Patch Dockerfile for postgres feature
+        run: |
+          sed -i 's/cargo build --release --locked/cargo build --release --locked --features memory-postgres/g' zeroclaw/Dockerfile
+
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -34,7 +38,6 @@ jobs:
         with:
           context: zeroclaw
           target: release
-          build-args: ZEROCLAW_CARGO_FEATURES=memory-postgres
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/bl4ko/zeroclaw:latest

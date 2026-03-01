@@ -3,14 +3,11 @@
   "language": "en",
   "words": [
     "zeroclaw",
-    "distroless",
     "buildx",
     "gitleaks",
-    "hadolint",
     "cspell",
     "automerge",
-    "ghcr",
-    "kaniko"
+    "ghcr"
   ],
   "ignorePaths": [
     "node_modules",

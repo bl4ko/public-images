@@ -3,7 +3,6 @@
   "baseBranchPatterns": ["main"],
   "extends": [
     "config:recommended",
-    "docker:pinDigests",
     "helpers:pinGitHubActionDigests",
     ":pinDevDependencies"
   ],
@@ -23,9 +22,9 @@
   ],
   "regexManagers": [
     {
-      "fileMatch": ["images/.+/Dockerfile$"],
+      "fileMatch": ["\\.github/workflows/.+\\.yml$"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG \\w+=(?<currentValue>\\S+)"
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s+\\w+:\\s+(?<currentValue>\\S+)"
       ]
     }
   ],

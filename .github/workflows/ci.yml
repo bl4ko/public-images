@@ -10,25 +10,16 @@ permissions:
   packages: write
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      zeroclaw: ${{ steps.filter.outputs.zeroclaw }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
-        id: filter
-        with:
-          filters: |
-            zeroclaw:
-              - 'images/zeroclaw/**'
-
   build-zeroclaw:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.zeroclaw == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
+    # renovate: datasource=github-releases depName=zeroclaw-labs/zeroclaw
+    env:
+      ZEROCLAW_VERSION: v0.1.7
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Clone upstream zeroclaw
+        run: |
+          git clone --depth 1 --branch "$ZEROCLAW_VERSION" \
+            https://github.com/zeroclaw-labs/zeroclaw.git zeroclaw
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
@@ -41,7 +32,9 @@ jobs:
       - name: Build and push zeroclaw
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: images/zeroclaw
+          context: zeroclaw
+          target: release
+          build-args: ZEROCLAW_CARGO_FEATURES=memory-postgres
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/bl4ko/zeroclaw:latest

@@ -15,7 +15,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth 1 --branch "${ZEROCLAW_VERSION}" \
-    https://github.com/zeroclaw-labs/zeroclaw.git .
+    https://github.com/zeroclaw-labs/zeroclaw.git . && \
+    sed -i '/^dist\/$/d' web/.gitignore
 
 RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
@@ -40,4 +41,4 @@ WORKDIR /zeroclaw-data
 USER 65534:65534
 EXPOSE 42617
 ENTRYPOINT ["zeroclaw"]
-CMD ["gateway"]
+CMD ["daemon"]

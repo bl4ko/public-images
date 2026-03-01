@@ -3,8 +3,6 @@
 # renovate: datasource=github-releases depName=zeroclaw-labs/zeroclaw
 ARG ZEROCLAW_VERSION=v0.1.7
 
-FROM ghcr.io/zeroclaw-labs/zeroclaw:${ZEROCLAW_VERSION} AS upstream
-
 FROM rust:1.93-slim AS builder
 
 WORKDIR /app
@@ -18,15 +16,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 RUN git clone --depth 1 --branch "${ZEROCLAW_VERSION}" \
     https://github.com/zeroclaw-labs/zeroclaw.git .
-
-# Build web/dist placeholder (frontend assets not in git)
-RUN mkdir -p web/dist && \
-    printf '%s\n' \
-      '<!doctype html>' \
-      '<html lang="en"><head><meta charset="utf-8"/>' \
-      '<title>ZeroClaw Dashboard</title></head>' \
-      '<body><h1>Dashboard</h1></body></html>' \
-      > web/dist/index.html
 
 RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \

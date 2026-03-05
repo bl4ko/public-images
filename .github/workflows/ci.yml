@@ -12,8 +12,8 @@ permissions:
 jobs:
   build-zeroclaw:
     runs-on: ubuntu-latest
-    # renovate: datasource=github-releases depName=zeroclaw-labs/zeroclaw
     env:
+      # renovate: datasource=github-releases depName=zeroclaw-labs/zeroclaw
       ZEROCLAW_VERSION: v0.1.7
     steps:
       - name: Clone upstream zeroclaw

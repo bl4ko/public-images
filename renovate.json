@@ -20,8 +20,9 @@
       "groupName": "github actions"
     }
   ],
-  "regexManagers": [
+  "customManagers": [
     {
+      "customType": "regex",
       "fileMatch": ["\\.github/workflows/.+\\.yml$"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s+\\w+:\\s+(?<currentValue>\\S+)"

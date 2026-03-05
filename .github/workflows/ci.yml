@@ -4,8 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags:
-      - "v*"
 
 permissions:
   contents: read
@@ -40,13 +38,12 @@ jobs:
         with:
           context: zeroclaw
           target: release
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/bl4ko/zeroclaw:latest
-            ghcr.io/bl4ko/zeroclaw:${{ github.ref_name }}
+            ghcr.io/bl4ko/zeroclaw:${{ env.ZEROCLAW_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   gitleaks:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     uses: bl4ko/shared-actions/.github/workflows/gitleaks.yml@main

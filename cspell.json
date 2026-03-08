@@ -7,7 +7,9 @@
     "gitleaks",
     "cspell",
     "automerge",
-    "ghcr"
+    "ghcr",
+    "slopus",
+    "pglite"
   ],
   "ignorePaths": [
     "node_modules",

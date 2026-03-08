@@ -1,0 +1,49 @@
+name: Build zeroclaw
+
+on:
+  pull_request:
+    paths: ['.github/workflows/build-zeroclaw.yml']
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-zeroclaw.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # renovate: datasource=github-releases depName=zeroclaw-labs/zeroclaw
+      ZEROCLAW_VERSION: v0.1.8
+    steps:
+      - name: Clone upstream zeroclaw
+        run: |
+          git clone --depth 1 --branch "$ZEROCLAW_VERSION" \
+            https://github.com/zeroclaw-labs/zeroclaw.git zeroclaw
+
+      - name: Patch Dockerfile for postgres feature
+        run: |
+          sed -i 's/cargo build --release --locked/cargo build --release --locked --features memory-postgres/g' zeroclaw/Dockerfile
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+
+      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push zeroclaw
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
+        with:
+          context: zeroclaw
+          target: release
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/bl4ko/zeroclaw:latest
+            ghcr.io/bl4ko/zeroclaw:${{ env.ZEROCLAW_VERSION }}
+          cache-from: type=gha,scope=zeroclaw
+          cache-to: type=gha,scope=zeroclaw,mode=max

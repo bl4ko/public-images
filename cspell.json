@@ -12,7 +12,9 @@
     "pglite",
     "xcaddy",
     "cloudflare",
-    "caddy"
+    "caddy",
+    "paperless",
+    "tesseract"
   ],
   "ignorePaths": [
     "node_modules",

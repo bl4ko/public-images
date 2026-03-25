@@ -9,7 +9,10 @@
     "automerge",
     "ghcr",
     "slopus",
-    "pglite"
+    "pglite",
+    "xcaddy",
+    "cloudflare",
+    "caddy"
   ],
   "ignorePaths": [
     "node_modules",

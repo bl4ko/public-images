@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # renovate: datasource=github-releases depName=zeroclaw-labs/zeroclaw
-      ZEROCLAW_VERSION: v0.1.8
+      ZEROCLAW_VERSION: v0.6.2
     steps:
       - name: Clone upstream zeroclaw
         run: |

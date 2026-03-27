@@ -10,4 +10,4 @@ permissions:
 
 jobs:
   scan:
-    uses: bl4ko/shared-actions/.github/workflows/gitleaks.yml@014ad18c68899f04e7ff27b498e4872820e20455 # main
+    uses: bl4ko/shared-actions/.github/workflows/gitleaks.yml@37e2500100b0b94ba2135342e1d9f6f2054a6019 # main

@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "baseBranchPatterns": ["main"],
+  "baseBranchPatterns": [
+    "main"
+  ],
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
@@ -11,11 +13,19 @@
   },
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "pinDigest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "pinDigest"
+      ],
       "automerge": true
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "automerge": true,
       "groupName": "github actions"
     }
@@ -23,12 +33,15 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["\\.github/workflows/.+\\.yml$"],
+      "fileMatch": [
+        "\\.github/workflows/.+\\.yml$"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s+\\w+:\\s+(?<currentValue>\\S+)"
       ]
     }
   ],
   "platformAutomerge": true,
-  "timezone": "Europe/Ljubljana"
+  "timezone": "Europe/Ljubljana",
+  "minimumReleaseAge": "3 days"
 }

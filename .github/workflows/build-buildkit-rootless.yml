@@ -1,0 +1,44 @@
+name: Build buildkit-rootless
+
+on:
+  pull_request:
+    paths: ['.github/workflows/build-buildkit-rootless.yml', 'buildkit-rootless/**']
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-buildkit-rootless.yml', 'buildkit-rootless/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # renovate: datasource=docker depName=moby/buildkit
+      BUILDKIT_VERSION: v0.31.0-rootless
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push buildkit-rootless
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: buildkit-rootless
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/bl4ko/buildkit-rootless:latest
+            ghcr.io/bl4ko/buildkit-rootless:${{ env.BUILDKIT_VERSION }}
+          cache-from: type=gha,scope=buildkit-rootless
+          cache-to: type=gha,scope=buildkit-rootless,mode=max

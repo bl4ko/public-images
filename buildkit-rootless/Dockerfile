@@ -1,4 +1,4 @@
-FROM moby/buildkit:v0.31.2-rootless@sha256:e23714775eb30345e2704636b0a9583aea3c47f0f05b444a7b3871dbaa775bf6
+FROM moby/buildkit:v0.31.2-rootless@sha256:0eeb84626c0cd01aecae7848c5ed8f095aec279dd936d0cdb5a64110f42ca65b
 
 USER root
 RUN chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap

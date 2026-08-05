@@ -4,7 +4,7 @@ ARG EXTENSION_VERSION=1.17.0
 # audit-pinned commit; re-audit source before bumping
 ARG EXTENSION_COMMIT=665011f7ef021850ce5e7a92e33a8bf969c9a29f
 
-RUN git clone --depth 1 --branch "$EXTENSION_VERSION" https://github.com/klausbetz/apple-identity-provider-keycloak.git /src \
+RUN git clone --depth 1 --branch "$EXTENSION_VERSION" https://github.com/bl4ko/keycloak-apple-idp.git /src \
     && cd /src \
     && [ "$(git rev-parse HEAD)" = "$EXTENSION_COMMIT" ]
 

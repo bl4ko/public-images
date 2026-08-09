@@ -1,0 +1,45 @@
+name: Build seerr
+
+on:
+  pull_request:
+    paths: ['.github/workflows/build-seerr.yml', 'seerr/**']
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-seerr.yml', 'seerr/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # renovate: datasource=docker depName=ghcr.io/seerr-team/seerr
+      SEERR_VERSION: 3.4.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push seerr
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: seerr
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          build-args: SEERR_VERSION=${{ env.SEERR_VERSION }}
+          tags: |
+            ghcr.io/bl4ko/seerr:latest
+            ghcr.io/bl4ko/seerr:${{ env.SEERR_VERSION }}
+          cache-from: type=gha,scope=seerr
+          cache-to: type=gha,scope=seerr,mode=max

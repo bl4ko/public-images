@@ -13,6 +13,7 @@
     "cloudflare",
     "caddy",
     "paperless",
+    "seerr",
     "tesseract"
   ],
   "ignorePaths": [

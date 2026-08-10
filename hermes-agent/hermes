@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+auth_path="$HOME/.hermes/auth.json"
+if [ ! -s "$auth_path" ] && [ -n "${HERMES_AUTH_JSON_B64:-}" ]; then
+  umask 077
+  mkdir -p "${auth_path%/*}"
+  printf '%s' "$HERMES_AUTH_JSON_B64" | base64 -d > "$auth_path"
+fi
+unset HERMES_AUTH_JSON_B64
+exec /home/agent/.venv/bin/hermes-real "$@"

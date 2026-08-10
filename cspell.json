@@ -13,10 +13,7 @@
     "cloudflare",
     "caddy",
     "paperless",
-    "hermes",
-    "kagent",
-    "tesseract",
-    "venv"
+    "tesseract"
   ],
   "ignorePaths": [
     "node_modules",

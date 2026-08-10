@@ -1,4 +1,4 @@
-FROM ghcr.io/kagent-dev/kagent/acp-sandbox-hermes@sha256:9d8c0a4eff9b4fb20a50b5722f8b6f68dd919e26414d8f70d12fe2d94cc24085
+FROM ghcr.io/kagent-dev/kagent/acp-sandbox-hermes@sha256:9d8c7b4c94cb242a502ef8a763115f72b78f3c23079e71f6f07d5a0b76a03697
 
 USER root
 RUN apt-get update \

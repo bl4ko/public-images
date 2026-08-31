@@ -32,6 +32,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push caddy-crowdsec
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: caddy-crowdsec
@@ -40,5 +41,8 @@ jobs:
           tags: |
             ghcr.io/bl4ko/caddy-crowdsec:latest
             ghcr.io/bl4ko/caddy-crowdsec:${{ env.CADDY_VERSION }}
+            ghcr.io/bl4ko/caddy-crowdsec:${{ github.sha }}
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha,scope=caddy-crowdsec
           cache-to: type=gha,scope=caddy-crowdsec,mode=max

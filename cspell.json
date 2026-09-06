@@ -3,6 +3,7 @@
   "language": "en",
   "words": [
     "buildx",
+    "Emby",
     "gitleaks",
     "cspell",
     "automerge",
@@ -13,6 +14,9 @@
     "cloudflare",
     "caddy",
     "paperless",
+    "jellyfin",
+    "ldflags",
+    "trimpath",
     "tesseract"
   ],
   "ignorePaths": [

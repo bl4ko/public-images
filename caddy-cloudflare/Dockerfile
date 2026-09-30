@@ -6,7 +6,6 @@ RUN xcaddy build \
     --replace golang.org/x/net=golang.org/x/net@v0.56.0 \
     --replace golang.org/x/text=golang.org/x/text@v0.39.0 \
     --replace google.golang.org/grpc=google.golang.org/grpc@v1.83.2 \
-    --replace github.com/google/cel-go=github.com/google/cel-go@v0.29.0 \
     --replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc=go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc@v0.21.0 \
     --replace go.opentelemetry.io/otel/sdk/log=go.opentelemetry.io/otel/sdk/log@v0.21.0 \
     --replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp=go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp@v0.21.0 \

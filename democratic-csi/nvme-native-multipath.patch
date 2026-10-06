@@ -1,0 +1,16 @@
+--- a/src/utils/nvmeof.js
++++ b/src/utils/nvmeof.js
+@@ -342,7 +342,12 @@
+       ]);
+     } catch (err) {
+       if (err.code == 1 && err.stderr.includes("No such file or directory")) {
+-        return false;
++        try {
++          result = await nvmeof.exec("ls", ["/sys/class/block"]);
++        } catch (e) {
++          return false;
++        }
++        return /\bnvme\d+c\d+n\d+\b/.test(result.stdout);
+       }
+       throw err;
+     }

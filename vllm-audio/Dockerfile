@@ -1,3 +1,3 @@
-FROM docker.io/vllm/vllm-openai:v0.31.0@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
+FROM docker.io/vllm/vllm-openai:v0.32.0@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
 RUN uv pip install --system --no-cache --no-deps --only-binary :all: av==19.0.0
 RUN python3 -c 'import io,wave,numpy as np; from vllm.multimodal.media.audio import load_audio_pyav; from vllm.multimodal.audio import resample_audio_pyav; b=io.BytesIO(); w=wave.open(b,"wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(48000); w.writeframes(np.zeros(48000,dtype=np.int16).tobytes()); w.close(); b.seek(0); a,sr=load_audio_pyav(b,sr=None); r=resample_audio_pyav(a,orig_sr=sr,target_sr=16000); assert sr==48000 and len(r)==16000'

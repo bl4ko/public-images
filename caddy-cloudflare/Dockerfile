@@ -18,4 +18,5 @@ RUN xcaddy build \
 FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 RUN apk upgrade --no-cache brotli-libs && apk version -t "$(apk info -e -v brotli-libs | sed 's/^brotli-libs-//')" 1.2.1-r0 | grep -q "[=>]"
+RUN apk upgrade --no-cache curl libcurl && apk version -t "$(apk info -e -v curl | sed 's/^curl-//')" 8.23.0-r0 | grep -q "[=>]"
 RUN caddy list-modules | grep -qx dns.providers.cloudflare && caddy validate --config /etc/caddy/Caddyfile

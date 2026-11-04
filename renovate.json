@@ -42,7 +42,8 @@
     }
   ],
   "platformAutomerge": true,
-  "rebaseWhen": "conflicted",
+  "rebaseWhen": "behind-base-branch",
+  "prConcurrentLimit": 5,
   "timezone": "Europe/Ljubljana",
   "minimumReleaseAge": "3 days"
 }

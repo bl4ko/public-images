@@ -21,7 +21,17 @@
     "cloudflare",
     "caddy",
     "paperless",
-    "tesseract"
+    "tesseract",
+    "clickhouse",
+    "distroless",
+    "goarch",
+    "ldflags",
+    "nologin",
+    "nonroot",
+    "nossl",
+    "prctl",
+    "trimpath",
+    "trixie"
   ],
   "ignorePaths": [
     "node_modules",

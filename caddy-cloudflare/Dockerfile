@@ -2,9 +2,9 @@ FROM caddy:2.11.7-builder-alpine@sha256:95a5e7e2692b5eb9545aadc5b90a39f6f509bee5
 
 RUN xcaddy build \
     --with github.com/caddy-dns/cloudflare \
-    --replace golang.org/x/crypto=golang.org/x/crypto@v0.56.0 \
-    --replace golang.org/x/net=golang.org/x/net@v0.56.0 \
-    --replace golang.org/x/text=golang.org/x/text@v0.39.0 \
+    --replace golang.org/x/crypto=golang.org/x/crypto@v0.58.0 \
+    --replace golang.org/x/net=golang.org/x/net@v0.62.0 \
+    --replace golang.org/x/text=golang.org/x/text@v0.43.0 \
     --replace google.golang.org/grpc=google.golang.org/grpc@v1.83.2 \
     --replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc=go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc@v0.21.0 \
     --replace go.opentelemetry.io/otel/sdk/log=go.opentelemetry.io/otel/sdk/log@v0.21.0 \

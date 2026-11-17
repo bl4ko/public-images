@@ -31,7 +31,8 @@
     "nossl",
     "prctl",
     "trimpath",
-    "trixie"
+    "trixie",
+    "noninteractive"
   ],
   "ignorePaths": [
     "node_modules",

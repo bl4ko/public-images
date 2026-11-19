@@ -20,4 +20,5 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 RUN apk upgrade --no-cache brotli-libs && apk version -t "$(apk info -e -v brotli-libs | sed 's/^brotli-libs-//')" 1.2.1-r0 | grep -q "[=>]"
 RUN apk upgrade --no-cache curl libcurl && apk version -t "$(apk info -e -v curl | sed 's/^curl-//')" 8.23.0-r0 | grep -q "[=>]"
 RUN apk upgrade --no-cache zlib && apk version -t "$(apk info -e -v zlib | sed 's/^zlib-//')" 1.4-r0 | grep -q "[=>]"
+RUN apk upgrade --no-cache libcrypto3 libssl3 && apk version -t "$(apk info -e -v libssl3 | sed 's/^libssl3-//')" 3.5.9-r1 | grep -q "[=>]" && apk version -t "$(apk info -e -v libcrypto3 | sed 's/^libcrypto3-//')" 3.5.9-r1 | grep -q "[=>]"
 RUN caddy list-modules | grep -qx dns.providers.cloudflare && caddy validate --config /etc/caddy/Caddyfile

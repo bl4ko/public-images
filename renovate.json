@@ -28,6 +28,32 @@
       ],
       "automerge": true,
       "groupName": "github actions"
+    },
+    {
+      "matchPackageNames": [
+        "moby/buildkit"
+      ],
+      "groupName": "buildkit"
+    },
+    {
+      "matchPackageNames": [
+        "opencontainers/runc",
+        "rootless-containers/rootlesskit"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "automerge": false
+    },
+    {
+      "matchDatasources": [
+        "github-tags"
+      ],
+      "matchPackageNames": [
+        "moby/buildkit"
+      ],
+      "allowedVersions": "/^v\\d+\\.\\d+\\.\\d+$/"
     }
   ],
   "customManagers": [
@@ -38,6 +64,15 @@
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s+\\w+:\\s+(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate-commit: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\w+_VERSION=(?<currentValue>\\S+)\\s+ARG \\w+_COMMIT=(?<currentDigest>[0-9a-f]{40})"
       ]
     }
   ],

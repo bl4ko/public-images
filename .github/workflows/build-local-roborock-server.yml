@@ -1,0 +1,46 @@
+name: Build local-roborock-server
+
+on:
+  pull_request:
+    paths: ['.github/workflows/build-local-roborock-server.yml', 'local-roborock-server/**']
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-local-roborock-server.yml', 'local-roborock-server/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # renovate: datasource=github-releases depName=Python-roborock/local_roborock_server
+      LOCAL_ROBOROCK_SERVER_VERSION: 1.2.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push local-roborock-server
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: local-roborock-server
+          build-args: |
+            LOCAL_ROBOROCK_SERVER_VERSION=${{ env.LOCAL_ROBOROCK_SERVER_VERSION }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/bl4ko/local-roborock-server:latest
+            ghcr.io/bl4ko/local-roborock-server:${{ env.LOCAL_ROBOROCK_SERVER_VERSION }}
+          cache-from: type=gha,scope=local-roborock-server
+          cache-to: type=gha,scope=local-roborock-server,mode=max

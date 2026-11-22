@@ -4,50 +4,58 @@ FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24@sha256:70bd7ddea8b6cbe5d
 RUN apk add --no-cache clang lld musl-dev file git pkgconfig
 COPY --from=xx / /
 ENV GOFLAGS=-mod=mod GOTOOLCHAIN=local CGO_ENABLED=0
+RUN git config --global user.name build && git config --global user.email build@localhost && git config --global --add safe.directory /src
 
 FROM gobuild AS buildkit
 # renovate-commit: datasource=github-tags depName=moby/buildkit
 ARG BUILDKIT_VERSION=v0.35.1
 ARG BUILDKIT_COMMIT=412cc86ad3c4252b82e929f9b1b1ad167376ded8
-ADD --checksum=${BUILDKIT_COMMIT} https://github.com/moby/buildkit.git?ref=${BUILDKIT_VERSION} /src
+ADD --keep-git-dir=true --checksum=${BUILDKIT_COMMIT} https://github.com/moby/buildkit.git?ref=${BUILDKIT_VERSION} /src
 WORKDIR /src
 ARG TARGETPLATFORM
 RUN rm -rf vendor && \
     go get github.com/moby/go-archive@v0.3.3 && \
+    git add -A && git commit -qm hardened && git tag -f ${BUILDKIT_VERSION} && \
     ldflags="-X github.com/moby/buildkit/version.Version=${BUILDKIT_VERSION} -X github.com/moby/buildkit/version.Revision=${BUILDKIT_COMMIT} -X github.com/moby/buildkit/version.Package=github.com/moby/buildkit" && \
     xx-go build -tags grpcnotrace -ldflags "$ldflags" -o /out/buildctl ./cmd/buildctl && \
     xx-go build -tags "osusergo netgo static_build seccomp grpcnotrace" -ldflags "$ldflags -extldflags '-static'" -o /out/buildkitd ./cmd/buildkitd && \
     xx-verify --static /out/buildctl && xx-verify --static /out/buildkitd && \
     go version -m /out/buildkitd | grep -Eq '^[[:space:]]+dep[[:space:]]+github.com/moby/go-archive[[:space:]]+v0.3.3[[:space:]]' && \
+    go version -m /out/buildkitd | grep -Eq "^[[:space:]]+mod[[:space:]]+github.com/moby/buildkit[[:space:]]+${BUILDKIT_VERSION}[[:space:]]" && \
+    go version -m /out/buildctl | grep -Eq "^[[:space:]]+mod[[:space:]]+github.com/moby/buildkit[[:space:]]+${BUILDKIT_VERSION}[[:space:]]" && \
     go version -m /out/buildkitd | grep -Eq '^/out/buildkitd: go1\.27\.'
 
 FROM gobuild AS runc
 # renovate-commit: datasource=github-tags depName=opencontainers/runc
 ARG RUNC_VERSION=v1.5.3
 ARG RUNC_COMMIT=46365c62967c76a765a5e347f48f0c7b3b571fe9
-ADD --checksum=${RUNC_COMMIT} https://github.com/opencontainers/runc.git?ref=${RUNC_VERSION} /src
+ADD --keep-git-dir=true --checksum=${RUNC_COMMIT} https://github.com/opencontainers/runc.git?ref=${RUNC_VERSION} /src
 WORKDIR /src
 ARG TARGETPLATFORM
 RUN xx-apk add --no-cache musl-dev gcc libseccomp-dev libseccomp-static
 RUN rm -rf vendor && \
     go get golang.org/x/net@v0.62.0 && \
+    git add -A && git commit -qm hardened && git tag -f ${RUNC_VERSION} && \
     CGO_ENABLED=1 xx-go build -tags "apparmor seccomp netgo cgo static_build osusergo" -ldflags "-X main.gitCommit=${RUNC_COMMIT} -extldflags -static" -o /out/buildkit-runc . && \
     xx-verify --static /out/buildkit-runc && \
     go version -m /out/buildkit-runc | grep -Eq '^[[:space:]]+dep[[:space:]]+golang.org/x/net[[:space:]]+v0.62.0[[:space:]]' && \
+    go version -m /out/buildkit-runc | grep -Eq "^[[:space:]]+mod[[:space:]]+github.com/opencontainers/runc[[:space:]]+${RUNC_VERSION}[[:space:]]" && \
     go version -m /out/buildkit-runc | grep -Eq '^/out/buildkit-runc: go1\.27\.'
 
 FROM gobuild AS rootlesskit
 # renovate-commit: datasource=github-tags depName=rootless-containers/rootlesskit
 ARG ROOTLESSKIT_VERSION=v3.2.0
 ARG ROOTLESSKIT_COMMIT=f0cc012b20fd6039fc0b73e83051a521a4690a2e
-ADD --checksum=${ROOTLESSKIT_COMMIT} https://github.com/rootless-containers/rootlesskit.git?ref=${ROOTLESSKIT_VERSION} /src
+ADD --keep-git-dir=true --checksum=${ROOTLESSKIT_COMMIT} https://github.com/rootless-containers/rootlesskit.git?ref=${ROOTLESSKIT_VERSION} /src
 WORKDIR /src
 ARG TARGETPLATFORM
 RUN rm -rf vendor && \
     go get golang.org/x/net@v0.62.0 && \
+    git add -A && git commit -qm hardened && git tag -f ${ROOTLESSKIT_VERSION} && \
     xx-go build -o /out/rootlesskit ./cmd/rootlesskit && \
     xx-verify --static /out/rootlesskit && \
     go version -m /out/rootlesskit | grep -Eq '^[[:space:]]+dep[[:space:]]+golang.org/x/net[[:space:]]+v0.62.0[[:space:]]' && \
+    go version -m /out/rootlesskit | grep -Eq "^[[:space:]]+mod[[:space:]]+github.com/rootless-containers/rootlesskit/v3[[:space:]]+${ROOTLESSKIT_VERSION}[[:space:]]" && \
     go version -m /out/rootlesskit | grep -Eq '^/out/rootlesskit: go1\.27\.'
 
 FROM moby/buildkit:v0.35.1-rootless@sha256:7d02292556e66feea6d2d89b7ec143503b57e4f59a4efc6b7ece8547e4d3e5be

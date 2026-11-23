@@ -16,8 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # renovate: datasource=github-releases depName=Python-roborock/local_roborock_server
-      LOCAL_ROBOROCK_SERVER_VERSION: 1.2.1
+      LOCAL_ROBOROCK_SERVER_REF: c836f4f0d25cd864ef6a079214ba73975c8ebe06
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -36,11 +35,11 @@ jobs:
         with:
           context: local-roborock-server
           build-args: |
-            LOCAL_ROBOROCK_SERVER_VERSION=${{ env.LOCAL_ROBOROCK_SERVER_VERSION }}
+            LOCAL_ROBOROCK_SERVER_REF=${{ env.LOCAL_ROBOROCK_SERVER_REF }}
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/bl4ko/local-roborock-server:latest
-            ghcr.io/bl4ko/local-roborock-server:${{ env.LOCAL_ROBOROCK_SERVER_VERSION }}
+            ghcr.io/bl4ko/local-roborock-server:${{ env.LOCAL_ROBOROCK_SERVER_REF }}
           cache-from: type=gha,scope=local-roborock-server
           cache-to: type=gha,scope=local-roborock-server,mode=max

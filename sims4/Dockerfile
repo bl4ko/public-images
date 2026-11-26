@@ -12,7 +12,7 @@ RUN apk add --no-cache curl \
 FROM --platform=$BUILDPLATFORM docker.io/library/alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f AS art
 ARG SIMS4_COVER_SHA256=8122d5812009f96566805ef9e5ad458aafe047366a4e0d2fb4265d9b4422d731
 ARG EA_MARK_SHA256=3e67cf1a00d750626b72619ff5139b1a7e9d539a66b984ebf22a7b67e2a6bfa9
-RUN apk add --no-cache curl imagemagick rsvg-convert font-dejavu \
+RUN apk add --no-cache curl imagemagick imagemagick-jpeg rsvg-convert font-dejavu \
     && mkdir -p /art && cd /tmp \
     && curl -fsSL -o cover.jpg https://cdn.cloudflare.steamstatic.com/steam/apps/1222670/library_600x900_2x.jpg \
     && echo "${SIMS4_COVER_SHA256}  cover.jpg" | sha256sum -c - \

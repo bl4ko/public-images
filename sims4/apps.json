@@ -1,0 +1,43 @@
+{
+  "env": {},
+  "apps": [
+    {
+      "name": "Desktop",
+      "prep-cmd": [
+        {
+          "do": "sh -c \". /tmp/runtime/session.env; swaymsg output HEADLESS-1 mode ${SUNSHINE_CLIENT_WIDTH:-1920}x${SUNSHINE_CLIENT_HEIGHT:-1080}@${SUNSHINE_CLIENT_FPS:-60}Hz\"",
+          "undo": ""
+        }
+      ],
+      "auto-detach": "true",
+      "wait-all": "true",
+      "exclude-global-prep-cmd": "false"
+    },
+    {
+      "name": "The Sims 4",
+      "cmd": "/opt/sims4/bin/sims4-run game",
+      "prep-cmd": [
+        {
+          "do": "sh -c \". /tmp/runtime/session.env; swaymsg output HEADLESS-1 mode ${SUNSHINE_CLIENT_WIDTH:-1920}x${SUNSHINE_CLIENT_HEIGHT:-1080}@${SUNSHINE_CLIENT_FPS:-60}Hz\"",
+          "undo": "/opt/sims4/bin/sims4-run stop"
+        }
+      ],
+      "auto-detach": "false",
+      "wait-all": "true",
+      "exclude-global-prep-cmd": "false"
+    },
+    {
+      "name": "EA app",
+      "cmd": "/opt/sims4/bin/sims4-run ea",
+      "prep-cmd": [
+        {
+          "do": "sh -c \". /tmp/runtime/session.env; swaymsg output HEADLESS-1 mode ${SUNSHINE_CLIENT_WIDTH:-1920}x${SUNSHINE_CLIENT_HEIGHT:-1080}@${SUNSHINE_CLIENT_FPS:-60}Hz\"",
+          "undo": "/opt/sims4/bin/sims4-run stop"
+        }
+      ],
+      "auto-detach": "false",
+      "wait-all": "true",
+      "exclude-global-prep-cmd": "false"
+    }
+  ]
+}

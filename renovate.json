@@ -23,6 +23,12 @@
       "automerge": true
     },
     {
+      "matchFileNames": [
+        "sims4/**"
+      ],
+      "automerge": false
+    },
+    {
       "matchManagers": [
         "github-actions"
       ],

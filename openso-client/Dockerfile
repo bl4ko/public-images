@@ -9,6 +9,9 @@ RUN apk add --no-cache curl unzip imagemagick font-dejavu \
     && echo "${OPENSO_CLIENT_SHA256}  client.zip" | sha256sum -c - \
     && mkdir -p /opt/openso && unzip -q client.zip -d /opt/openso && rm client.zip \
     && test -x /opt/openso/OpenSO && test -d /opt/openso/Content \
+    && grep -ohiE '"guid"[[:space:]]*:[[:space:]]*"[^"]+"' /opt/openso/Content/UI/hints/*/*.json | sed -E 's/.*"([^"]+)"$/"\1"/' | sort -u | paste -sd, - \
+        | sed -E 's/^/{"ShownGUIDs":[/; s/$/]}/' > /opt/openso/Content/readhints.json \
+    && test "$(grep -o '","' /opt/openso/Content/readhints.json | wc -l)" -ge 20 \
     && curl -fsSL -o openso.ico "https://raw.githubusercontent.com/voicemxil/OpenSO/${OPENSO_COMMIT}/TSOClient/FSO.Unix/openso.ico" \
     && echo "${OPENSO_ICON_SHA256}  openso.ico" | sha256sum -c - \
     && mkdir -p /art \
@@ -62,6 +65,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libudev1 \
     jq \
     tini \
+    xdotool \
+    inotify-tools \
     libx11-6 \
     libx11-xcb1 \
     libxext6 \

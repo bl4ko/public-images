@@ -68,6 +68,11 @@ for _ in $(seq 1 50); do
     sleep 0.2
 done
 
+for _ in $(seq 1 50); do
+    [[ -n "${SWAYSOCK}" ]] && SWAYSOCK="${SWAYSOCK}" swaymsg -t get_inputs >/dev/null 2>&1 && break
+    sleep 0.2
+done
+
 if [[ -z "${SWAYSOCK}" || -z "${WAYLAND_SOCK}" ]]; then
     echo "Sway failed to start:" >&2
     cat "${SWAYLOG}" >&2 || true

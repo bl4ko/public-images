@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+. /tmp/runtime/session.env
+renice --priority 0 -p $$ >/dev/null 2>&1 || true
+
+rm -f "${XDG_RUNTIME_DIR}/display"
+swaymsg exec "printf %s \"\$DISPLAY\" > ${XDG_RUNTIME_DIR}/display" >/dev/null 2>&1 || true
+for _ in $(seq 1 40); do [[ -s "${XDG_RUNTIME_DIR}/display" ]] && break; sleep 0.05; done
+[[ -s "${XDG_RUNTIME_DIR}/display" ]] && DISPLAY="$(cat "${XDG_RUNTIME_DIR}/display")" && export DISPLAY
+
+export PROTON_USE_WOW64=1
+export PROTON_USE_XALIA=0
+export SteamAppId=1222670
+export SteamGameId=1222670
+export STEAM_COMPAT_APP_ID=1222670
+export DXVK_FRAME_RATE=60
+export DXVK_CONFIG_FILE=/opt/sims4/dxvk.conf
+export SDL_JOYSTICK_DISABLE_UDEV=1
+export LD_PRELOAD="/opt/sims4/lib/libsims4-input.so${LD_PRELOAD:+:${LD_PRELOAD}}"
+export PROTON_LOG_DIR=/data/proton/logs
+mkdir -p "${PROTON_LOG_DIR}"
+exec > >(tee -a "${PROTON_LOG_DIR}/sims4-run.log") 2>&1
+
+[[ -f /tmp/runtime/bench.env ]] && . /tmp/runtime/bench.env
+if [[ -n "${SIMS4_BENCH_DIR:-}" && "${1:-game}" != stop ]]; then
+    mkdir -p "${SIMS4_BENCH_DIR}/mangohud"
+    export MANGOHUD=1
+    export MANGOHUD_CONFIG="no_display,autostart_log=1,log_interval=0,log_duration=${SIMS4_BENCH_SECS:-60},output_folder=${SIMS4_BENCH_DIR}/mangohud"
+    export DXVK_LOG_LEVEL=info DXVK_LOG_PATH="${SIMS4_BENCH_DIR}"
+    echo "launch $(date +%s.%N) ${1:-game}" >> "${SIMS4_BENCH_DIR}/launch.txt"
+fi
+
+C="${STEAM_COMPAT_DATA_PATH}/pfx/drive_c"
+TS4="${C}/Program Files/EA Games/The Sims 4/Game/Bin/TS4_x64.exe"
+EAD="${C}/Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe"
+INSTALLER=/data/installers/EAappInstaller.exe
+INSTALLER_URL=https://origin-a.akamaihd.net/EA-Desktop-Client-Download/installer-releases/EAappInstaller.exe
+
+proton() {
+    exec "${PROTON}/proton" waitforexitandrun "$@"
+}
+
+ea_app() {
+    if [[ -f "${EAD}" ]]; then
+        proton "${EAD}"
+    fi
+    if [[ ! -s "${INSTALLER}" ]]; then
+        curl -fSL --retry 3 -o "${INSTALLER}.part" "${INSTALLER_URL}"
+        mv "${INSTALLER}.part" "${INSTALLER}"
+    fi
+    proton "${INSTALLER}"
+}
+
+case "${1:-game}" in
+    game)
+        if [[ -f "${TS4}" ]]; then
+            proton "${TS4}"
+        fi
+        ea_app
+        ;;
+    ea)
+        ea_app
+        ;;
+    stop)
+        pkill -f 'TS4_x64\.exe|EADesktop\.exe|EAappInstaller\.exe|EABackgroundService\.exe|EALocalHostSvc\.exe' || true
+        for _ in $(seq 1 50); do
+            pgrep -f 'TS4_x64\.exe|EADesktop\.exe|EAappInstaller\.exe' >/dev/null || exit 0
+            sleep 0.1
+        done
+        WINEPREFIX="${STEAM_COMPAT_DATA_PATH}/pfx" "${PROTON}/files/bin/wineserver" -k || true
+        ;;
+    *)
+        echo "usage: sims4-run [game|ea|stop]" >&2
+        exit 2
+        ;;
+esac

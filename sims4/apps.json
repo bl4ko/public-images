@@ -2,7 +2,7 @@
   "env": {},
   "apps": [
     {
-      "name": "Desktop",
+      "name": "Desktop (test)",
       "prep-cmd": [
         {
           "do": "sh -c \". /tmp/runtime/session.env; swaymsg output HEADLESS-1 mode ${SUNSHINE_CLIENT_WIDTH:-1920}x${SUNSHINE_CLIENT_HEIGHT:-1080}@${SUNSHINE_CLIENT_FPS:-60}Hz\"",
@@ -11,7 +11,8 @@
       ],
       "auto-detach": "true",
       "wait-all": "true",
-      "exclude-global-prep-cmd": "false"
+      "exclude-global-prep-cmd": "false",
+      "image-path": "desktop.png"
     },
     {
       "name": "The Sims 4",
@@ -24,7 +25,8 @@
       ],
       "auto-detach": "false",
       "wait-all": "true",
-      "exclude-global-prep-cmd": "false"
+      "exclude-global-prep-cmd": "false",
+      "image-path": "/opt/sims4/art/sims4.png"
     },
     {
       "name": "EA app",
@@ -37,7 +39,8 @@
       ],
       "auto-detach": "false",
       "wait-all": "true",
-      "exclude-global-prep-cmd": "false"
+      "exclude-global-prep-cmd": "false",
+      "image-path": "/opt/sims4/art/ea.png"
     }
   ]
 }

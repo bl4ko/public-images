@@ -9,6 +9,20 @@ RUN apk add --no-cache curl \
     && mv "/opt/proton/${PROTON_VERSION}-x86_64" /opt/proton/current \
     && rm /tmp/proton.tar.gz
 
+FROM --platform=$BUILDPLATFORM docker.io/library/alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f AS art
+ARG SIMS4_COVER_SHA256=8122d5812009f96566805ef9e5ad458aafe047366a4e0d2fb4265d9b4422d731
+ARG EA_MARK_SHA256=3e67cf1a00d750626b72619ff5139b1a7e9d539a66b984ebf22a7b67e2a6bfa9
+RUN apk add --no-cache curl imagemagick rsvg-convert font-dejavu \
+    && mkdir -p /art && cd /tmp \
+    && curl -fsSL -o cover.jpg https://cdn.cloudflare.steamstatic.com/steam/apps/1222670/library_600x900_2x.jpg \
+    && echo "${SIMS4_COVER_SHA256}  cover.jpg" | sha256sum -c - \
+    && curl -fsSL -o ea.svg https://upload.wikimedia.org/wikipedia/commons/0/0d/Electronic-Arts-Logo.svg \
+    && echo "${EA_MARK_SHA256}  ea.svg" | sha256sum -c - \
+    && magick cover.jpg -resize 600x800 -background black -gravity center -extent 600x800 /art/sims4.png \
+    && rsvg-convert -w 340 -h 340 -o mark.png ea.svg \
+    && magick -size 600x800 xc:'#0e1014' mark.png -gravity center -geometry +0-70 -composite -density 72 \
+        -font /usr/share/fonts/dejavu/DejaVuSans-Bold.ttf -pointsize 58 -fill white -annotate +0+190 'EA app' /art/ea.png
+
 FROM docker.io/library/ubuntu:26.04@sha256:d66b366dac61b575bee2aef07e9c26e8070096fbe84a3d4d3eb0da069b5d76db AS native
 ARG WLROOTS_VERSION=0.19.2-1
 ENV DEBIAN_FRONTEND=noninteractive
@@ -115,6 +129,7 @@ RUN chmod 4755 /usr/lib/x86_64-linux-gnu/libsims4-uinput.so
 
 COPY --from=proton --chown=1000:1000 /opt/proton /opt/proton
 COPY sway.conf sunshine.conf apps.json dxvk.conf /opt/sims4/
+COPY --from=art /art /opt/sims4/art
 COPY --chmod=755 entrypoint.sh sims4-run /opt/sims4/bin/
 RUN install -m 0755 /usr/bin/nice /opt/sims4/bin/sunshine-nice \
     && setcap cap_sys_nice+ep /opt/sims4/bin/sunshine-nice

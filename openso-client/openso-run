@@ -74,6 +74,7 @@ mkdir -p /data/openso/logs
 exec > >(tee -a /data/openso/logs/openso-run.log) 2>&1
 
 [[ -f /tmp/runtime/bench.env ]] && . /tmp/runtime/bench.env
+LOGIN=${OPENSO_LOGIN_DIR:-${LOGIN}}
 if [[ -n "${SIMS4_BENCH_DIR:-}" ]]; then
     mkdir -p "${SIMS4_BENCH_DIR}/mangohud"
     export MANGOHUD=1
@@ -84,7 +85,7 @@ fi
 autologin() {
     local ini="${GAMEDIR}/TSOClient/login.ini"
     local pid prev cur calm=0 w
-    local fail=/data/openso/autologin-failed sas="${TSO}/TSOClient/gamedata/uiscripts/personselection1024.uis"
+    local fail="/data/openso/autologin-failed-$(cat "${LOGIN}/username")" sas="${TSO}/TSOClient/gamedata/uiscripts/personselection1024.uis"
     inotifywait -qq -t 300 -e open "${ini}" || return 0
     if [[ -e "${fail}" ]]; then
         inotifywait -qq -t 3600 -e open "${sas}" && rm -f "${fail}"

@@ -7,6 +7,14 @@ TSO=${OPENSO_TSO_DIR:-/tso}
 API=${OPENSO_API_URL:-http://openso-server.openso.svc.cluster.local:9000}
 
 stop() {
+    if [[ -f /tmp/runtime/session.env ]]; then
+        . /tmp/runtime/session.env
+        swaymsg '[class="(?i)^openso$"] kill' >/dev/null 2>&1 || true
+        for _ in $(seq 1 50); do
+            pgrep -x OpenSO >/dev/null || return 0
+            sleep 0.1
+        done
+    fi
     pkill -x OpenSO || true
     for _ in $(seq 1 50); do
         pgrep -x OpenSO >/dev/null || return 0
@@ -52,6 +60,7 @@ set_ini CitySelectorUrl "${API}"
 set_ini Windowed false
 set_ini GraphicsWidth "${SUNSHINE_CLIENT_WIDTH:-${W}}"
 set_ini GraphicsHeight "${SUNSHINE_CLIENT_HEIGHT:-${H}}"
+set_ini CompatState 2
 
 export SDL_VIDEODRIVER=x11
 export SDL_JOYSTICK_DISABLE_UDEV=1

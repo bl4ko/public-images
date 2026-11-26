@@ -83,8 +83,18 @@ fi
 
 autologin() {
     local ini="${GAMEDIR}/TSOClient/login.ini"
+    local pid prev cur calm=0
     inotifywait -qq -t 300 -e open "${ini}" || return 0
-    sleep 2
+    pid=$(pgrep -nx OpenSO) || return 0
+    prev=$(awk '{print $14+$15}' "/proc/${pid}/stat") || return 0
+    for _ in $(seq 1 60); do
+        sleep 1
+        cur=$(awk '{print $14+$15}' "/proc/${pid}/stat") || return 0
+        if (( cur - prev < 25 )); then calm=$((calm + 1)); else calm=0; fi
+        prev=${cur}
+        (( calm >= 2 )) && break
+    done
+    xdotool key --delay 20 End $(printf 'BackSpace %.0s' $(seq 1 64))
     xdotool type --delay 40 --file "${LOGIN}/password"
     xdotool keydown Return sleep 0.15 keyup Return
 }

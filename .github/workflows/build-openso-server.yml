@@ -1,0 +1,78 @@
+name: Build openso-server
+
+on:
+  pull_request:
+    paths: ['.github/workflows/build-openso-server.yml', 'openso-server/**']
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-openso-server.yml', 'openso-server/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/bl4ko/openso-server
+      CONTEXT_LABEL: dev.bl4ko.context-tree
+      PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - if: env.PUBLISH == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guard release tag
+        id: guard
+        run: |
+          version=$(cat openso-server/VERSION)
+          if ! printf '%s\n' "$version" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::openso-server/VERSION must be x.y.z, got '$version'"
+            exit 1
+          fi
+          tree=$(git rev-parse HEAD:openso-server)
+          {
+            echo "version=$version"
+            echo "tree=$tree"
+          } >> "$GITHUB_OUTPUT"
+          if out=$(skopeo inspect --override-os linux --override-arch amd64 "docker://$IMAGE:$version" 2>&1); then
+            published=$(printf '%s' "$out" | jq -r --arg k "$CONTEXT_LABEL" '.Labels[$k] // ""')
+            if [ "$published" != "$tree" ]; then
+              echo "::error::$IMAGE:$version exists with context $published, this tree is $tree: bump openso-server/VERSION"
+              exit 1
+            fi
+            echo "$IMAGE:$version already holds this context; skipping"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$out" | grep -Eqi 'manifest unknown|name unknown|403 Forbidden'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$out"
+            exit 1
+          fi
+
+      - if: steps.guard.outputs.build == 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Build and push openso-server
+        if: steps.guard.outputs.build == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: openso-server
+          platforms: linux/amd64
+          push: ${{ env.PUBLISH == 'true' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/bl4ko/public-images
+            org.opencontainers.image.version=${{ steps.guard.outputs.version }}
+            ${{ env.CONTEXT_LABEL }}=${{ steps.guard.outputs.tree }}
+          tags: ${{ env.IMAGE }}:${{ steps.guard.outputs.version }}

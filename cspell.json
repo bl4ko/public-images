@@ -32,7 +32,22 @@
     "prctl",
     "trimpath",
     "trixie",
-    "noninteractive"
+    "noninteractive",
+    "openso",
+    "skopeo",
+    "elif",
+    "opencontainers",
+    "elegibility",
+    "cabextract",
+    "userdel",
+    "argjson",
+    "gsub",
+    "pipefail",
+    "uigraphics",
+    "objectdata",
+    "packingslips",
+    "sounddata",
+    "esac"
   ],
   "ignorePaths": [
     "node_modules",

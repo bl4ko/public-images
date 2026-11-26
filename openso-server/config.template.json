@@ -1,0 +1,66 @@
+{
+  "gameLocation": null,
+  "simNFS": null,
+  "secret": null,
+  "allOpenable": true,
+  "database": {
+    "connectionString": null
+  },
+  "services": {
+    "tasks": {
+      "enabled": true,
+      "call_sign": "callisto",
+      "use_ssl": false,
+      "binding": "0.0.0.0:35101",
+      "internal_host": "127.0.0.1:35101",
+      "public_host": null,
+      "schedule": [
+        { "cron": "0 3 * * *", "task": "prune_database", "timeout": 3600, "parameter": {} },
+        { "cron": "0 4 * * *", "task": "bonus", "timeout": 3600, "shard_id": 1, "parameter": {} },
+        { "cron": "0 4 * * *", "task": "job_balance", "timeout": 3600, "parameter": {} },
+        { "cron": "0 0 * * *", "task": "neighborhood_tick", "timeout": 3600, "run_if_missed": true, "parameter": {} }
+      ],
+      "tuning": {
+        "bonus": {
+          "property_bonus": { "per_unit": 10, "overrides": { "1": 1500, "2": 1250, "3": 1000 } },
+          "visitor_bonus": { "per_unit": 8 }
+        }
+      }
+    },
+    "userApi": {
+      "enabled": true,
+      "bindings": ["http://+:9000/"],
+      "maintenance": false,
+      "useProxy": false,
+      "cdnUrl": null
+    },
+    "cities": [
+      {
+        "call_sign": "ganymede",
+        "id": 1,
+        "use_ssl": false,
+        "binding": "0.0.0.0:33101",
+        "internal_host": "127.0.0.1:33101",
+        "public_host": null,
+        "neighborhoods": {
+          "mayor_elegibility_limit": 4,
+          "mayor_elegibility_falloff": 4,
+          "min_nominations": 2,
+          "election_week_align": true,
+          "election_move_penalty": 14
+        }
+      }
+    ],
+    "lots": [
+      {
+        "call_sign": "europa",
+        "use_ssl": false,
+        "binding": "0.0.0.0:34101",
+        "internal_host": "127.0.0.1:34101",
+        "public_host": null,
+        "max_lots": 25,
+        "cities": [{ "id": 1, "host": "127.0.0.1:33101" }]
+      }
+    ]
+  }
+}

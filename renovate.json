@@ -24,7 +24,8 @@
     },
     {
       "matchFileNames": [
-        "sims4/**"
+        "sims4/**",
+        "openso-server/**"
       ],
       "automerge": false
     },

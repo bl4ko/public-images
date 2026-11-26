@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+link_saves() {
+    local docs="${STEAM_COMPAT_DATA_PATH:-/data/proton}/pfx/drive_c/users/steamuser/Documents" dst=/saves/Electronic\ Arts
+    [[ -d /saves && -w /saves && -d "${docs}" ]] || return 0
+    local src="${docs}/Electronic Arts"
+    [[ -L "${src}" && "$(readlink "${src}")" == "${dst}" ]] && return 0
+    mkdir -p "${dst}"
+    if [[ -d "${src}" && ! -L "${src}" ]]; then
+        cp -a "${src}/." "${dst}/"
+        rm -rf "${src}"
+    fi
+    ln -sfn "${dst}" "${src}"
+}
+
+if [[ "${1:-}" == link-saves ]]; then
+    link_saves
+    exit 0
+fi
+
 . /tmp/runtime/session.env
 renice --priority 0 -p $$ >/dev/null 2>&1 || true
 
@@ -52,6 +70,8 @@ ea_app() {
     proton "${INSTALLER}"
 }
 
+[[ "${1:-game}" == stop ]] || link_saves
+
 case "${1:-game}" in
     game)
         if [[ -f "${TS4}" ]]; then
@@ -71,7 +91,7 @@ case "${1:-game}" in
         WINEPREFIX="${STEAM_COMPAT_DATA_PATH}/pfx" "${PROTON}/files/bin/wineserver" -k || true
         ;;
     *)
-        echo "usage: sims4-run [game|ea|stop]" >&2
+        echo "usage: sims4-run [game|ea|stop|link-saves]" >&2
         exit 2
         ;;
 esac

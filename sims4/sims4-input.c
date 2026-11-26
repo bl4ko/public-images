@@ -2,12 +2,15 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <execinfo.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <linux/input.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +19,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 static const char *env_or(const char *name, const char *def) {
@@ -40,7 +44,8 @@ struct libevdev_uinput;
 struct pub {
 	struct libevdev_uinput *u;
 	char names[MAX_NODES][32];
-	int n;
+	int grabs[MAX_NODES];
+	int n, ng;
 	bool dead;
 	unsigned gen;
 };
@@ -54,16 +59,23 @@ struct job {
 static struct pub pubs[MAX_DEV];
 static pthread_mutex_t pub_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void wait_udev(const char *sys, const char *name) {
-	char p[PATH_MAX], devno[32] = {0};
+static bool wait_udev(const char *sys, const char *name) {
+	char p[PATH_MAX], devno[32] = {0}, line[256];
 	snprintf(p, sizeof(p), "%s/%s/dev", sys, name);
 	FILE *f = fopen(p, "r");
-	if (!f) return;
+	if (!f) return false;
 	if (!fgets(devno, sizeof(devno), f)) devno[0] = 0;
 	fclose(f);
 	devno[strcspn(devno, "\n")] = 0;
 	snprintf(p, sizeof(p), "/run/udev/data/c%s", devno);
 	for (int i = 0; i < 300 && access(p, F_OK); i++) usleep(10000);
+	bool hold = false;
+	if ((f = fopen(p, "r"))) {
+		while (fgets(line, sizeof(line), f))
+			if (!strcmp(line, "E:ID_INPUT_TOUCHSCREEN=1\n") || !strcmp(line, "E:ID_INPUT_TABLET=1\n")) hold = true;
+		fclose(f);
+	}
+	return hold;
 }
 
 static void *publish(void *arg) {
@@ -86,12 +98,27 @@ static void *publish(void *arg) {
 	}
 	const char *src = env_or("SIMS4_INPUT_SRC", "/dev/host-input");
 	for (int i = 0; i < n; i++) {
-		wait_udev(sysdup, names[i]);
+		bool hold = wait_udev(sysdup, names[i]);
 		char target[PATH_MAX], link[PATH_MAX], tmp[PATH_MAX];
 		snprintf(target, sizeof(target), "%s/%s", src, names[i]);
+		int gfd = -1;
+		if (hold && !strncmp(names[i], "event", 5)) {
+			gfd = open(target, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+			if (gfd >= 0 && ioctl(gfd, EVIOCGRAB, 1)) {
+				close(gfd);
+				gfd = -1;
+			}
+			fprintf(stderr, "sims4-input: %s %s\n", gfd >= 0 ? "holding" : "failed to hold", names[i]);
+		}
 		snprintf(link, sizeof(link), "%s/%s", dst_dir(), names[i]);
 		snprintf(tmp, sizeof(tmp), "%s/.%s.tmp", dst_dir(), names[i]);
 		pthread_mutex_lock(&pub_lock);
+		if (gfd >= 0) {
+			if (!pb->dead && pb->gen == gen && pb->ng < MAX_NODES)
+				pb->grabs[pb->ng++] = gfd;
+			else
+				close(gfd);
+		}
 		if (!pb->dead && pb->gen == gen && pb->n < MAX_NODES) {
 			unlink(tmp);
 			if (!symlink(target, tmp) && !rename(tmp, link)) {
@@ -169,6 +196,8 @@ void libevdev_uinput_destroy(struct libevdev_uinput *u) {
 	for (int i = 0; i < MAX_DEV; i++) {
 		if (pubs[i].u != u) continue;
 		pubs[i].dead = true;
+		for (int k = 0; k < pubs[i].ng; k++) close(pubs[i].grabs[k]);
+		pubs[i].ng = 0;
 		for (int k = 0; k < pubs[i].n; k++) {
 			char link[PATH_MAX];
 			snprintf(link, sizeof(link), "%s/%s", dst_dir(), pubs[i].names[k]);
@@ -235,8 +264,115 @@ static bool is_sway(void) {
 	return v;
 }
 
+struct wl_event_loop;
+struct wl_src {
+	void *interface;
+	struct wl_event_loop *loop;
+	void *prev, *next;
+	void *data;
+	int fd;
+};
+typedef int (*wl_fd_func)(int, uint32_t, void *);
+
+#define MAX_SRC 4096
+static struct {
+	struct wl_src *s;
+	void *func;
+	int fd;
+	bool removed;
+} srcs[MAX_SRC];
+static int nsrc;
+static pthread_mutex_t src_lock = PTHREAD_MUTEX_INITIALIZER;
+static __thread int in_wl;
+
+static void crash_sym(const char *tag, void *a) {
+	Dl_info d;
+	if (dladdr(a, &d) && d.dli_fname)
+		dprintf(2, "sims4-crash %s %s+0x%lx %s\n", tag, d.dli_fname, (unsigned long)((char *)a - (char *)d.dli_fbase), d.dli_sname ? d.dli_sname : "?");
+	else
+		dprintf(2, "sims4-crash %s %p\n", tag, a);
+}
+
+static void crash_bt(const char *tag) {
+	void *bt[32];
+	int n = backtrace(bt, 32);
+	for (int i = 1; i < n; i++) crash_sym(tag, bt[i]);
+}
+
+struct wl_src *wl_event_loop_add_fd(struct wl_event_loop *loop, int fd, uint32_t mask, wl_fd_func func, void *data) {
+	REAL(struct wl_src *, wl_event_loop_add_fd, struct wl_event_loop *, int, uint32_t, wl_fd_func, void *);
+	in_wl++;
+	struct wl_src *s = real_wl_event_loop_add_fd(loop, fd, mask, func, data);
+	in_wl--;
+	if (!s || !is_sway()) return s;
+	pthread_mutex_lock(&src_lock);
+	int slot = -1;
+	for (int i = 0; i < nsrc && slot < 0; i++)
+		if (srcs[i].removed || srcs[i].s == s) slot = i;
+	if (slot < 0 && nsrc < MAX_SRC) slot = nsrc++;
+	if (slot >= 0) {
+		srcs[slot].s = s;
+		srcs[slot].func = (void *)func;
+		srcs[slot].fd = s->fd;
+		srcs[slot].removed = false;
+	}
+	pthread_mutex_unlock(&src_lock);
+	return s;
+}
+
+int wl_event_source_remove(struct wl_src *s) {
+	REAL(int, wl_event_source_remove, struct wl_src *);
+	if (is_sway()) {
+		pthread_mutex_lock(&src_lock);
+		for (int i = 0; i < nsrc; i++)
+			if (srcs[i].s == s) srcs[i].removed = true;
+		pthread_mutex_unlock(&src_lock);
+	}
+	in_wl++;
+	int r = real_wl_event_source_remove(s);
+	in_wl--;
+	return r;
+}
+
+int close(int fd) {
+	REAL(int, close, int);
+	if (fd >= 0 && !in_wl && is_sway()) {
+		void *owner = NULL;
+		pthread_mutex_lock(&src_lock);
+		for (int i = 0; i < nsrc; i++)
+			if (!srcs[i].removed && srcs[i].fd == fd) owner = srcs[i].func;
+		pthread_mutex_unlock(&src_lock);
+		if (owner) {
+			dprintf(2, "sims4-crash foreign close of event source fd %d\n", fd);
+			crash_sym("owner", owner);
+			crash_bt("closer");
+		}
+	}
+	return real_close(fd);
+}
+
+static void crash_handler(int sig, siginfo_t *si, void *uc) {
+	void *rdi = (void *)((ucontext_t *)uc)->uc_mcontext.gregs[REG_RDI];
+	dprintf(2, "sims4-crash signal %d addr %p\n", sig, si->si_addr);
+	crash_sym("rip", (void *)((ucontext_t *)uc)->uc_mcontext.gregs[REG_RIP]);
+	for (int i = 0; i < nsrc; i++)
+		if ((void *)srcs[i].s == rdi) {
+			dprintf(2, "sims4-crash source fd %d removed %d\n", srcs[i].fd, srcs[i].removed);
+			crash_sym("source", srcs[i].func);
+		}
+	crash_bt("bt");
+	raise(sig);
+}
+
 __attribute__((constructor)) static void scrub_env(void) {
-	if (is_sway()) unsetenv("LD_PRELOAD");
+	if (!is_sway()) return;
+	unsetenv("LD_PRELOAD");
+	void *bt[2];
+	backtrace(bt, 2);
+	struct sigaction sa = {.sa_sigaction = crash_handler, .sa_flags = SA_SIGINFO | SA_RESETHAND};
+	sigaction(SIGSEGV, &sa, NULL);
+	sigaction(SIGBUS, &sa, NULL);
+	sigaction(SIGABRT, &sa, NULL);
 }
 
 static bool layout_active(void) {

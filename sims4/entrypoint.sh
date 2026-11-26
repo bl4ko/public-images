@@ -13,7 +13,16 @@ export STEAM_COMPAT_DATA_PATH=/data/proton
 export STEAM_COMPAT_CLIENT_INSTALL_PATH=/data/steam-stub
 
 mkdir -p "${HOME}" "${XDG_RUNTIME_DIR}" "${XDG_CONFIG_HOME}" "${XDG_CACHE_HOME}" "${__GL_SHADER_DISK_CACHE_PATH}" \
-    /data/sunshine/credentials "${STEAM_COMPAT_DATA_PATH}" "${STEAM_COMPAT_CLIENT_INSTALL_PATH}" /data/installers /data/screenshots
+    /data/sunshine/credentials "${STEAM_COMPAT_DATA_PATH}" "${STEAM_COMPAT_CLIENT_INSTALL_PATH}" /data/installers /data/screenshots /data/logs
+
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+SUNLOG="${XDG_CONFIG_HOME}/sunshine/sunshine.log"
+[[ -s "${SUNLOG}" ]] && mv -f "${SUNLOG}" "/data/logs/sunshine-$(date -u -r "${SUNLOG}" +%Y%m%dT%H%M%SZ).log"
+for p in sway sunshine; do
+    { ls -1t /data/logs/${p}-*.log 2>/dev/null || true; } | tail -n +11 | xargs -r rm -f
+done
+SWAYLOG="/data/logs/sway-${TS}.log"
+/opt/sims4/bin/sims4-run link-saves || true
 rm -rf "${XDG_RUNTIME_DIR:?}"/* /tmp/.X11-unix /tmp/.X[0-9]*-lock
 chmod 700 "${XDG_RUNTIME_DIR}"
 
@@ -44,7 +53,8 @@ if [[ -f /usr/share/vulkan/icd.d/nvidia_icd.x86_64.json ]]; then
     export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.x86_64.json
 fi
 
-LD_PRELOAD=/opt/sims4/lib/libsims4-input.so sway --unsupported-gpu -c /opt/sims4/sway.conf >/tmp/sway.log 2>&1 &
+ln -sfn "${SWAYLOG}" /tmp/sway.log
+sunshine-nice -n -10 env LD_PRELOAD=/opt/sims4/lib/libsims4-input.so sway --unsupported-gpu -c /opt/sims4/sway.conf >"${SWAYLOG}" 2>&1 &
 SWAY_PID=$!
 
 SWAYSOCK=""
@@ -60,7 +70,7 @@ done
 
 if [[ -z "${SWAYSOCK}" || -z "${WAYLAND_SOCK}" ]]; then
     echo "Sway failed to start:" >&2
-    cat /tmp/sway.log >&2 || true
+    cat "${SWAYLOG}" >&2 || true
     exit 1
 fi
 
@@ -93,8 +103,9 @@ trap 'kill "${SWAY_PID}" 2>/dev/null || true; pulseaudio --kill 2>/dev/null || t
 MAIN_PID=$$
 (
     while [[ -r /proc/${SWAY_PID}/stat && "$(cut -d' ' -f3 "/proc/${SWAY_PID}/stat" 2>/dev/null)" != Z ]]; do sleep 2; done
-    echo "sway exited, stopping sunshine" >&2
+    echo "sway exited, stopping sunshine" | tee -a "${SWAYLOG}" >&2
+    tail -n 60 "${SWAYLOG}" >&2
     kill -TERM "${MAIN_PID}"
 ) &
 
-exec sunshine-nice -n -15 sunshine /data/sunshine/sunshine.conf
+exec sunshine-nice -n -15 env LD_PRELOAD=libsims4-uinput.so sunshine /data/sunshine/sunshine.conf

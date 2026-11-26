@@ -154,12 +154,39 @@ __attribute__((constructor)) static void reset_links(void) {
 	closedir(d);
 }
 
+static bool node_dead(struct libevdev_uinput *u) {
+	const char *(*get_devnode)(struct libevdev_uinput *) = dlsym(RTLD_DEFAULT, "libevdev_uinput_get_devnode");
+	const char *node = get_devnode ? get_devnode(u) : NULL;
+	const char *base = node ? strrchr(node, '/') : NULL;
+	if (!base) return false;
+	char p[PATH_MAX];
+	snprintf(p, sizeof(p), "%s%s", env_or("SIMS4_INPUT_SRC", "/dev/host-input"), base);
+	for (int i = 0; i < 25; i++) {
+		int t = open(p, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+		if (t >= 0) {
+			close(t);
+			return false;
+		}
+		if (errno == ENODEV || errno == ENXIO) return true;
+		usleep(20000);
+	}
+	return false;
+}
+
 int libevdev_uinput_create_from_device(const struct libevdev *dev, int fd, struct libevdev_uinput **out) {
 	static int (*real)(const struct libevdev *, int, struct libevdev_uinput **);
 	if (!real) real = dlsym(RTLD_NEXT, "libevdev_uinput_create_from_device");
 	int rc = real(dev, fd, out);
 	struct stat st;
 	if (rc || !out || !*out || stat(env_or("SIMS4_INPUT_SRC", "/dev/host-input"), &st)) return rc;
+	for (int i = 0; i < 10 && node_dead(*out); i++) {
+		struct libevdev_uinput *stale = *out;
+		if (real(dev, -2, out) || !*out) {
+			*out = stale;
+			break;
+		}
+		fprintf(stderr, "sims4-input: parked a device on a dead event node\n");
+	}
 	const char *(*get_syspath)(struct libevdev_uinput *) = dlsym(RTLD_DEFAULT, "libevdev_uinput_get_syspath");
 	const char *sys = get_syspath ? get_syspath(*out) : NULL;
 	struct job *jb = sys ? calloc(1, sizeof(*jb)) : NULL;

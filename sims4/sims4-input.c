@@ -564,6 +564,16 @@ static int finish_open(int fd, int r) {
 	return fd;
 }
 
+#define RETRY_OPEN(call) \
+	({ \
+		int fd_ = (call); \
+		for (int i_ = 0; fd_ < 0 && r == 1 && (errno == ENODEV || errno == ENXIO) && i_ < 50; i_++) { \
+			usleep(20000); \
+			fd_ = (call); \
+		} \
+		fd_; \
+	})
+
 #define OPEN_WRAP(name, ...) \
 	int name(const char *path, int flags, ...) { \
 		REAL(int, name, const char *, int, ...); \
@@ -580,7 +590,7 @@ static int finish_open(int fd, int r) {
 			errno = ENOENT; \
 			return -1; \
 		} \
-		return finish_open(real_##name(r ? t : path, r ? flags & ~O_NOFOLLOW : flags, mode), r); \
+		return finish_open(RETRY_OPEN(real_##name(r ? t : path, r ? flags & ~O_NOFOLLOW : flags, mode)), r); \
 	}
 
 OPEN_WRAP(open)
@@ -602,7 +612,7 @@ OPEN_WRAP(open64)
 			errno = ENOENT; \
 			return -1; \
 		} \
-		return finish_open(real_##name(dirfd, r ? t : path, r ? flags & ~O_NOFOLLOW : flags, mode), r); \
+		return finish_open(RETRY_OPEN(real_##name(dirfd, r ? t : path, r ? flags & ~O_NOFOLLOW : flags, mode)), r); \
 	}
 
 OPENAT_WRAP(openat)
@@ -617,7 +627,7 @@ OPENAT_WRAP(openat64)
 			errno = ENOENT; \
 			return -1; \
 		} \
-		return finish_open(real_##name(r ? t : path, r ? flags & ~O_NOFOLLOW : flags), r); \
+		return finish_open(RETRY_OPEN(real_##name(r ? t : path, r ? flags & ~O_NOFOLLOW : flags)), r); \
 	}
 
 OPEN2_WRAP(__open_2)

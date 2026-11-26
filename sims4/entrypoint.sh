@@ -108,4 +108,9 @@ MAIN_PID=$$
     kill -TERM "${MAIN_PID}"
 ) &
 
-exec sunshine-nice -n -15 env LD_PRELOAD=libsims4-uinput.so sunshine /data/sunshine/sunshine.conf
+TUNING=()
+if [[ -s /data/sunshine/tuning.conf ]]; then
+    mapfile -t TUNING < <(sed -nE 's/^([a-z0-9_]+) *= *([A-Za-z0-9_.-]+) *$/\1=\2/p' /data/sunshine/tuning.conf)
+    echo "sunshine tuning overrides: ${TUNING[*]}" >&2
+fi
+exec sunshine-nice -n -15 env LD_PRELOAD=libsims4-uinput.so sunshine /data/sunshine/sunshine.conf "${TUNING[@]}"

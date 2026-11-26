@@ -25,7 +25,8 @@
     {
       "matchFileNames": [
         "sims4/**",
-        "openso-client/**"
+        "openso-client/**",
+        "openso-server/**"
       ],
       "automerge": false
     },

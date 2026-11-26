@@ -5,6 +5,8 @@ APP=/opt/openso
 CFG=/data/openso/config.ini
 TSO=${OPENSO_TSO_DIR:-/tso}
 API=${OPENSO_API_URL:-http://openso-server.openso.svc.cluster.local:9000}
+LOGIN=${OPENSO_LOGIN_DIR:-/run/secrets/openso-owner}
+GAMEDIR="${HOME}/Documents/The Sims Online"
 
 stop() {
     if [[ -f /tmp/runtime/session.env ]]; then
@@ -51,7 +53,10 @@ if [[ ! -f "${TSO}/TSOClient/tuning.dat" ]]; then
 fi
 
 mkdir -p "${HOME}/Documents" /data/openso
-ln -sfn "${TSO}" "${HOME}/Documents/The Sims Online"
+rm -rf "${GAMEDIR}"
+mkdir -p "${GAMEDIR}/TSOClient"
+for e in "${TSO}"/*; do [[ "${e##*/}" == TSOClient ]] || ln -s "${e}" "${GAMEDIR}/"; done
+ln -s "${TSO}"/TSOClient/* "${GAMEDIR}/TSOClient/"
 touch "${CFG}"
 ln -sfn "${CFG}" "${APP}/Content/config.ini"
 read -r W H < <(swaymsg -t get_outputs | jq -r '.[0].current_mode | "\(.width) \(.height)"')
@@ -74,6 +79,20 @@ if [[ -n "${SIMS4_BENCH_DIR:-}" ]]; then
     export MANGOHUD=1
     export MANGOHUD_CONFIG="no_display,autostart_log=1,log_interval=0,log_duration=${SIMS4_BENCH_SECS:-60},output_folder=${SIMS4_BENCH_DIR}/mangohud"
     echo "launch $(date +%s.%N) openso" >> "${SIMS4_BENCH_DIR}/launch.txt"
+fi
+
+autologin() {
+    local ini="${GAMEDIR}/TSOClient/login.ini"
+    inotifywait -qq -t 300 -e open "${ini}" || return 0
+    sleep 2
+    xdotool type --delay 40 --file "${LOGIN}/password"
+    xdotool keydown Return sleep 0.15 keyup Return
+}
+
+if [[ -s "${LOGIN}/username" && -s "${LOGIN}/password" && ( -z "${SIMS4_BENCH_DIR:-}" || -n "${OPENSO_BENCH_AUTOLOGIN:-}" ) ]]; then
+    printf '[LastSession]\nUserName=%s\n' "$(cat "${LOGIN}/username")" > "${GAMEDIR}/TSOClient/login.ini"
+    set_ini LastUser "$(cat "${LOGIN}/username")"
+    autologin &
 fi
 
 cd "${APP}"

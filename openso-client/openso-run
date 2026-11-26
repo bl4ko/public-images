@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP=/opt/openso
+CFG=/data/openso/config.ini
+TSO=${OPENSO_TSO_DIR:-/tso}
+API=${OPENSO_API_URL:-http://openso-server.openso.svc.cluster.local:9000}
+
+stop() {
+    pkill -x OpenSO || true
+    for _ in $(seq 1 50); do
+        pgrep -x OpenSO >/dev/null || return 0
+        sleep 0.1
+    done
+    pkill -9 -x OpenSO || true
+}
+
+set_ini() {
+    if grep -q "^$1=" "${CFG}"; then
+        sed -i "s#^$1=.*#$1=$2#" "${CFG}"
+    else
+        printf '%s=%s\n' "$1" "$2" >> "${CFG}"
+    fi
+}
+
+if [[ "${1:-run}" == stop ]]; then
+    stop
+    exit 0
+fi
+[[ "${1:-}" == run ]] && shift
+
+. /tmp/runtime/session.env
+renice --priority 0 -p $$ >/dev/null 2>&1 || true
+
+rm -f "${XDG_RUNTIME_DIR}/display"
+swaymsg exec "printf %s \"\$DISPLAY\" > ${XDG_RUNTIME_DIR}/display" >/dev/null 2>&1 || true
+for _ in $(seq 1 40); do [[ -s "${XDG_RUNTIME_DIR}/display" ]] && break; sleep 0.05; done
+[[ -s "${XDG_RUNTIME_DIR}/display" ]] && DISPLAY="$(cat "${XDG_RUNTIME_DIR}/display")" && export DISPLAY
+
+if [[ ! -f "${TSO}/TSOClient/tuning.dat" ]]; then
+    echo "openso-run: The Sims Online files are missing at ${TSO}/TSOClient" >&2
+    exit 1
+fi
+
+mkdir -p "${HOME}/Documents" /data/openso
+ln -sfn "${TSO}" "${HOME}/Documents/The Sims Online"
+touch "${CFG}"
+ln -sfn "${CFG}" "${APP}/Content/config.ini"
+read -r W H < <(swaymsg -t get_outputs | jq -r '.[0].current_mode | "\(.width) \(.height)"')
+set_ini GameEntryUrl "${API}"
+set_ini CitySelectorUrl "${API}"
+set_ini Windowed false
+set_ini GraphicsWidth "${SUNSHINE_CLIENT_WIDTH:-${W}}"
+set_ini GraphicsHeight "${SUNSHINE_CLIENT_HEIGHT:-${H}}"
+
+export SDL_VIDEODRIVER=x11
+export SDL_JOYSTICK_DISABLE_UDEV=1
+export LD_PRELOAD="/opt/sims4/lib/libsims4-input.so${LD_PRELOAD:+:${LD_PRELOAD}}"
+mkdir -p /data/openso/logs
+exec > >(tee -a /data/openso/logs/openso-run.log) 2>&1
+
+[[ -f /tmp/runtime/bench.env ]] && . /tmp/runtime/bench.env
+if [[ -n "${SIMS4_BENCH_DIR:-}" ]]; then
+    mkdir -p "${SIMS4_BENCH_DIR}/mangohud"
+    export MANGOHUD=1
+    export MANGOHUD_CONFIG="no_display,autostart_log=1,log_interval=0,log_duration=${SIMS4_BENCH_SECS:-60},output_folder=${SIMS4_BENCH_DIR}/mangohud"
+    echo "launch $(date +%s.%N) openso" >> "${SIMS4_BENCH_DIR}/launch.txt"
+fi
+
+cd "${APP}"
+[[ -n "${SIMS4_BENCH_DIR:-}" ]] && exec mangohud --dlsym ./OpenSO "$@"
+exec ./OpenSO "$@"

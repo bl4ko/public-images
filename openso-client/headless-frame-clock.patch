@@ -1,0 +1,129 @@
+--- a/backend/headless/output.c	2026-11-26 09:46:10
++++ b/backend/headless/output.c	2026-11-26 09:46:10
+@@ -1,6 +1,10 @@
++#define _POSIX_C_SOURCE 200809L
+ #include <assert.h>
+ #include <stdlib.h>
+ #include <stdio.h>
++#include <sys/timerfd.h>
++#include <time.h>
++#include <unistd.h>
+ #include <wlr/interfaces/wlr_output.h>
+ #include <wlr/types/wlr_output_layer.h>
+ #include <wlr/util/log.h>
+@@ -28,9 +32,37 @@
+ 		refresh = HEADLESS_DEFAULT_REFRESH;
+ 	}
+ 
+-	output->frame_delay = 1000000 / refresh;
++	output->frame_period_ns = 1000000000000LL / refresh;
+ }
+ 
++static int64_t monotonic_ns(void) {
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
++}
++
++static void schedule_frame(struct wlr_headless_output *output) {
++	if (output->frame_armed) {
++		return;
++	}
++	int64_t now = monotonic_ns();
++	int64_t period = output->frame_period_ns;
++	if (output->next_frame_ns == 0) {
++		output->next_frame_ns = now + period;
++	} else if (output->next_frame_ns <= now) {
++		output->next_frame_ns += ((now - output->next_frame_ns) / period + 1) * period;
++	}
++	struct itimerspec its = {
++		.it_value = {
++			.tv_sec = output->next_frame_ns / 1000000000LL,
++			.tv_nsec = output->next_frame_ns % 1000000000LL,
++		},
++	};
++	if (timerfd_settime(output->frame_fd, TFD_TIMER_ABSTIME, &its, NULL) == 0) {
++		output->frame_armed = true;
++	}
++}
++
+ static bool output_test(struct wlr_output *wlr_output,
+ 		const struct wlr_output_state *state) {
+ 	uint32_t unsupported = state->committed & ~SUPPORTED_OUTPUT_STATE;
+@@ -73,7 +105,7 @@
+ 		};
+ 		output_defer_present(wlr_output, present_event);
+ 
+-		wl_event_source_timer_update(output->frame_timer, output->frame_delay);
++		schedule_frame(output);
+ 	}
+ 
+ 	return true;
+@@ -95,6 +127,7 @@
+ 
+ 	wl_list_remove(&output->link);
+ 	wl_event_source_remove(output->frame_timer);
++	close(output->frame_fd);
+ 	free(output);
+ }
+ 
+@@ -110,8 +143,13 @@
+ 	return wlr_output->impl == &output_impl;
+ }
+ 
+-static int signal_frame(void *data) {
++static int signal_frame(int fd, uint32_t mask, void *data) {
+ 	struct wlr_headless_output *output = data;
++	uint64_t expirations;
++	if (read(fd, &expirations, sizeof(expirations)) < 0) {
++		return 0;
++	}
++	output->frame_armed = false;
+ 	wlr_output_send_frame(&output->wlr_output);
+ 	return 0;
+ }
+@@ -126,6 +164,12 @@
+ 		wlr_log(WLR_ERROR, "Failed to allocate wlr_headless_output");
+ 		return NULL;
+ 	}
++	output->frame_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
++	if (output->frame_fd < 0) {
++		wlr_log_errno(WLR_ERROR, "Failed to create frame timerfd");
++		free(output);
++		return NULL;
++	}
+ 	output->backend = backend;
+ 	struct wlr_output *wlr_output = &output->wlr_output;
+ 
+@@ -148,7 +192,7 @@
+ 	snprintf(description, sizeof(description), "Headless output %zu", output_num);
+ 	wlr_output_set_description(wlr_output, description);
+ 
+-	output->frame_timer = wl_event_loop_add_timer(backend->event_loop, signal_frame, output);
++	output->frame_timer = wl_event_loop_add_fd(backend->event_loop, output->frame_fd, WL_EVENT_READABLE, signal_frame, output);
+ 
+ 	wl_list_insert(&backend->outputs, &output->link);
+ 
+--- a/include/backend/headless.h	2026-11-26 09:46:10
++++ b/include/backend/headless.h	2026-11-26 09:46:10
+@@ -1,6 +1,8 @@
+ #ifndef BACKEND_HEADLESS_H
+ #define BACKEND_HEADLESS_H
+ 
++#include <stdbool.h>
++#include <stdint.h>
+ #include <wlr/backend/headless.h>
+ #include <wlr/backend/interface.h>
+ 
+@@ -21,7 +23,10 @@
+ 	struct wl_list link;
+ 
+ 	struct wl_event_source *frame_timer;
+-	int frame_delay; // ms
++	int frame_fd;
++	int64_t frame_period_ns;
++	int64_t next_frame_ns;
++	bool frame_armed;
+ };
+ 
+ struct wlr_headless_backend *headless_backend_from_backend(

@@ -9,21 +9,22 @@ RUN apk add --no-cache curl \
     && mv "/opt/proton/${PROTON_VERSION}-x86_64" /opt/proton/current \
     && rm /tmp/proton.tar.gz
 
-FROM docker.io/library/ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 AS native
+FROM docker.io/library/ubuntu:26.04@sha256:d66b366dac61b575bee2aef07e9c26e8070096fbe84a3d4d3eb0da069b5d76db AS native
+ARG WLROOTS_VERSION=0.19.2-1
 ENV DEBIAN_FRONTEND=noninteractive
 RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
     && apt-get update && apt-get install -y --no-install-recommends dpkg-dev build-essential fakeroot \
-    && apt-get build-dep -y wlroots=0.17.1-2.1build1 \
-    && mkdir /build && cd /build && apt-get source wlroots=0.17.1-2.1build1
+    && apt-get build-dep -y wlroots=${WLROOTS_VERSION} \
+    && mkdir /build && cd /build && apt-get source wlroots=${WLROOTS_VERSION}
 COPY headless-frame-clock.patch /build/
-RUN cd /build/wlroots-0.17.1 && cp ../headless-frame-clock.patch debian/patches/ \
+RUN cd /build/wlroots-${WLROOTS_VERSION%-*} && cp ../headless-frame-clock.patch debian/patches/ \
     && echo headless-frame-clock.patch >> debian/patches/series \
-    && DEB_BUILD_OPTIONS="nocheck nodoc parallel=4" dpkg-buildpackage -b -uc -us
+    && DEB_CFLAGS_APPEND=-Wno-error DEB_BUILD_OPTIONS="nocheck nodoc parallel=4" dpkg-buildpackage -b -uc -us
 COPY sims4-input.c /build/
 RUN gcc -O2 -Wall -Wextra -Werror -Wno-format-truncation -fPIC -shared -DSIMS4_UINPUT -o /build/libsims4-uinput.so /build/sims4-input.c -ldl -lpthread \
     && gcc -O2 -Wall -Wextra -Werror -Wno-format-truncation -fPIC -shared -o /build/libsims4-input.so /build/sims4-input.c -ldl -lpthread
 
-FROM docker.io/library/ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
+FROM docker.io/library/ubuntu:26.04@sha256:d66b366dac61b575bee2aef07e9c26e8070096fbe84a3d4d3eb0da069b5d76db
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -86,8 +87,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ARG SUNSHINE_VERSION=2026.914.233613
-ARG SUNSHINE_SHA256=c38e9c705f650f8705f61702717e99bec34044c5028fcb8f23a08fe041292c21
-RUN curl -fsSL "https://github.com/LizardByte/Sunshine/releases/download/v${SUNSHINE_VERSION}/sunshine_${SUNSHINE_VERSION}-1+ubuntu24.04_amd64.deb" -o /tmp/sunshine.deb \
+ARG SUNSHINE_SHA256=b8a8ceeeb2b3f30a18a994ad268c94e0c91170f33a864c7aad31eed927ad7d47
+RUN curl -fsSL "https://github.com/LizardByte/Sunshine/releases/download/v${SUNSHINE_VERSION}/sunshine_${SUNSHINE_VERSION}-1+ubuntu26.04_amd64.deb" -o /tmp/sunshine.deb \
     && echo "${SUNSHINE_SHA256}  /tmp/sunshine.deb" | sha256sum -c - \
     && apt-get update && apt-get install -y --no-install-recommends /tmp/sunshine.deb \
     && rm -f /tmp/sunshine.deb \
@@ -105,11 +106,12 @@ RUN mkdir -p /etc/vulkan/icd.d /usr/share/glvnd/egl_vendor.d /usr/share/egl/egl_
     && mkdir -p /data /tmp/runtime /opt/sims4/bin \
     && chown -R 1000:1000 /data /tmp/runtime
 
-COPY --from=native /build/libwlroots12t64_0.17.1-2.1build1_amd64.deb /tmp/
-RUN dpkg -i /tmp/libwlroots12t64_0.17.1-2.1build1_amd64.deb && rm /tmp/libwlroots12t64_0.17.1-2.1build1_amd64.deb \
-    && apt-mark hold libwlroots12t64
-COPY --from=native /build/libsims4-uinput.so /build/libsims4-input.so /opt/sims4/lib/
-RUN echo /opt/sims4/lib/libsims4-uinput.so > /etc/ld.so.preload
+COPY --from=native /build/libwlroots-0.19_*_amd64.deb /tmp/
+RUN dpkg -i /tmp/libwlroots-0.19_*_amd64.deb && rm /tmp/libwlroots-0.19_*_amd64.deb \
+    && apt-mark hold libwlroots-0.19
+COPY --from=native /build/libsims4-input.so /opt/sims4/lib/
+COPY --from=native /build/libsims4-uinput.so /usr/lib/x86_64-linux-gnu/
+RUN chmod 4755 /usr/lib/x86_64-linux-gnu/libsims4-uinput.so
 
 COPY --from=proton --chown=1000:1000 /opt/proton /opt/proton
 COPY sway.conf sunshine.conf apps.json dxvk.conf /opt/sims4/

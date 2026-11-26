@@ -83,8 +83,13 @@ fi
 
 autologin() {
     local ini="${GAMEDIR}/TSOClient/login.ini"
-    local pid prev cur calm=0
+    local pid prev cur calm=0 w
+    local fail=/data/openso/autologin-failed sas="${TSO}/TSOClient/gamedata/uiscripts/personselection1024.uis"
     inotifywait -qq -t 300 -e open "${ini}" || return 0
+    if [[ -e "${fail}" ]]; then
+        inotifywait -qq -t 3600 -e open "${sas}" && rm -f "${fail}"
+        return 0
+    fi
     pid=$(pgrep -nx OpenSO) || return 0
     prev=$(awk '{print $14+$15}' "/proc/${pid}/stat") || return 0
     for _ in $(seq 1 60); do
@@ -94,9 +99,13 @@ autologin() {
         prev=${cur}
         (( calm >= 2 )) && break
     done
+    touch "${fail}"
+    inotifywait -qq -t 60 -e open "${sas}" &
+    w=$!
     xdotool key --delay 20 End $(printf 'BackSpace %.0s' $(seq 1 64))
     xdotool type --delay 40 --file "${LOGIN}/password"
     xdotool keydown Return sleep 0.15 keyup Return
+    wait "${w}" && rm -f "${fail}"
 }
 
 if [[ -s "${LOGIN}/username" && -s "${LOGIN}/password" && ( -z "${SIMS4_BENCH_DIR:-}" || -n "${OPENSO_BENCH_AUTOLOGIN:-}" ) ]]; then

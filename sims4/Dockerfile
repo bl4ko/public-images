@@ -19,7 +19,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
 COPY headless-frame-clock.patch /build/
 RUN cd /build/wlroots-${WLROOTS_VERSION%-*} && cp ../headless-frame-clock.patch debian/patches/ \
     && echo headless-frame-clock.patch >> debian/patches/series \
-    && DEB_BUILD_OPTIONS="nocheck nodoc parallel=4" dpkg-buildpackage -b -uc -us
+    && DEB_CFLAGS_APPEND=-Wno-error=switch DEB_BUILD_OPTIONS="nocheck nodoc parallel=4" dpkg-buildpackage -b -uc -us
 COPY sims4-input.c /build/
 RUN gcc -O2 -Wall -Wextra -Werror -Wno-format-truncation -fPIC -shared -DSIMS4_UINPUT -o /build/libsims4-uinput.so /build/sims4-input.c -ldl -lpthread \
     && gcc -O2 -Wall -Wextra -Werror -Wno-format-truncation -fPIC -shared -o /build/libsims4-input.so /build/sims4-input.c -ldl -lpthread

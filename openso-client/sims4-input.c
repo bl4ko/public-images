@@ -39,6 +39,7 @@ struct libevdev;
 struct libevdev_uinput;
 
 #define MAX_DEV 32
+static void ufd_add(struct libevdev_uinput *u, int fd);
 #define MAX_NODES 4
 
 struct pub {
@@ -178,15 +179,20 @@ int libevdev_uinput_create_from_device(const struct libevdev *dev, int fd, struc
 	if (!real) real = dlsym(RTLD_NEXT, "libevdev_uinput_create_from_device");
 	int rc = real(dev, fd, out);
 	struct stat st;
-	if (rc || !out || !*out || stat(env_or("SIMS4_INPUT_SRC", "/dev/host-input"), &st)) return rc;
-	for (int i = 0; i < 10 && node_dead(*out); i++) {
+	if (rc || !out || !*out) return rc;
+	int (*get_fd)(struct libevdev_uinput *) = dlsym(RTLD_DEFAULT, "libevdev_uinput_get_fd");
+	bool src = !stat(env_or("SIMS4_INPUT_SRC", "/dev/host-input"), &st);
+	for (int i = 0; src && i < 10 && node_dead(*out); i++) {
 		struct libevdev_uinput *stale = *out;
 		if (real(dev, -2, out) || !*out) {
 			*out = stale;
 			break;
 		}
+		if (fd >= 0 && get_fd && dup(fd) >= 0) dup2(get_fd(*out), fd);
 		fprintf(stderr, "sims4-input: parked a device on a dead event node\n");
 	}
+	ufd_add(*out, fd >= 0 ? fd : get_fd ? get_fd(*out) : -1);
+	if (!src) return rc;
 	const char *(*get_syspath)(struct libevdev_uinput *) = dlsym(RTLD_DEFAULT, "libevdev_uinput_get_syspath");
 	const char *sys = get_syspath ? get_syspath(*out) : NULL;
 	struct job *jb = sys ? calloc(1, sizeof(*jb)) : NULL;
@@ -217,11 +223,10 @@ int libevdev_uinput_create_from_device(const struct libevdev *dev, int fd, struc
 }
 
 #define MAX_CLICK 32
-
-typedef int (*write_fn)(const struct libevdev_uinput *, unsigned int, unsigned int, int);
+#define MAX_EV 64
 
 struct click {
-	const struct libevdev_uinput *u;
+	int fd;
 	unsigned code, gen;
 	long long down;
 	bool pending;
@@ -233,8 +238,13 @@ struct delay {
 	long long at;
 };
 
-static write_fn real_write;
+static ssize_t (*real_wr)(int, const void *, size_t);
 static struct click clicks[MAX_CLICK];
+static struct {
+	struct libevdev_uinput *u;
+	int fd;
+} ufds[MAX_DEV];
+static int nufds;
 static pthread_mutex_t click_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static long long now_ms(void) {
@@ -249,19 +259,38 @@ static long click_min(void) {
 	return v;
 }
 
-static struct click *click_slot(const struct libevdev_uinput *u, unsigned code) {
+static void ufd_add(struct libevdev_uinput *u, int fd) {
+	if (fd < 0) return;
+	pthread_mutex_lock(&click_lock);
+	for (int i = 0; i < MAX_DEV; i++)
+		if (!ufds[i].u) {
+			ufds[i].u = u;
+			ufds[i].fd = fd;
+			nufds++;
+			break;
+		}
+	pthread_mutex_unlock(&click_lock);
+}
+
+static bool is_ufd(int fd) {
+	for (int i = 0; i < MAX_DEV; i++)
+		if (ufds[i].u && ufds[i].fd == fd) return true;
+	return false;
+}
+
+static struct click *click_slot(int fd, unsigned code) {
 	struct click *empty = NULL;
 	for (int i = 0; i < MAX_CLICK; i++) {
-		if (clicks[i].u == u && clicks[i].code == code) return &clicks[i];
-		if (!clicks[i].u && !empty) empty = &clicks[i];
+		if (clicks[i].fd == fd + 1 && clicks[i].code == code) return &clicks[i];
+		if (!clicks[i].fd && !empty) empty = &clicks[i];
 	}
-	if (empty) *empty = (struct click){.u = u, .code = code, .gen = empty->gen + 1};
+	if (empty) *empty = (struct click){.fd = fd + 1, .code = code, .gen = empty->gen + 1};
 	return empty;
 }
 
 static void release_now(struct click *c) {
-	real_write(c->u, EV_KEY, c->code, 0);
-	real_write(c->u, EV_SYN, SYN_REPORT, 0);
+	struct input_event ev[2] = {{.type = EV_KEY, .code = c->code, .value = 0}, {.type = EV_SYN, .code = SYN_REPORT}};
+	real_wr(c->fd - 1, ev, sizeof(ev));
 	c->pending = false;
 	c->gen++;
 }
@@ -277,46 +306,68 @@ static void *delayed_release(void *arg) {
 	return NULL;
 }
 
-int libevdev_uinput_write_event(const struct libevdev_uinput *u, unsigned int type, unsigned int code, int value) {
-	if (!real_write) real_write = (write_fn)dlsym(RTLD_NEXT, "libevdev_uinput_write_event");
-	if (type != EV_KEY || code < BTN_LEFT || code > BTN_TASK || (value != 0 && value != 1) || click_min() <= 0)
-		return real_write(u, type, code, value);
+static bool defer_release(struct click *c) {
+	struct delay *d = malloc(sizeof(*d));
+	if (!d) return false;
+	*d = (struct delay){.c = c, .gen = c->gen, .at = c->down + click_min()};
+	pthread_t t;
+	pthread_attr_t a;
+	pthread_attr_init(&a);
+	pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+	bool ok = !pthread_create(&t, &a, delayed_release, d);
+	pthread_attr_destroy(&a);
+	if (!ok) free(d);
+	c->pending = ok;
+	return ok;
+}
+
+ssize_t write(int fd, const void *buf, size_t n) {
+	if (!real_wr) real_wr = dlsym(RTLD_NEXT, "write");
+	const size_t sz = sizeof(struct input_event);
+	if (!nufds || !n || n % sz || n > MAX_EV * sz || click_min() <= 0) return real_wr(fd, buf, n);
 	pthread_mutex_lock(&click_lock);
-	struct click *c = click_slot(u, code);
-	int rc = 0;
-	if (c && value == 1) {
-		if (c->pending) release_now(c);
-		c->down = now_ms();
-		rc = real_write(u, type, code, value);
-	} else if (c && c->down && now_ms() - c->down < click_min()) {
-		struct delay *d = malloc(sizeof(*d));
-		pthread_t t;
-		pthread_attr_t a;
-		pthread_attr_init(&a);
-		pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
-		if (d) *d = (struct delay){.c = c, .gen = c->gen, .at = c->down + click_min()};
-		if (d && !pthread_create(&t, &a, delayed_release, d)) {
-			c->pending = true;
-		} else {
-			free(d);
-			rc = real_write(u, type, code, value);
-		}
-		pthread_attr_destroy(&a);
-		c->down = 0;
-	} else {
-		if (c) c->down = 0;
-		rc = real_write(u, type, code, value);
+	if (!is_ufd(fd)) {
+		pthread_mutex_unlock(&click_lock);
+		return real_wr(fd, buf, n);
 	}
+	const struct input_event *in = buf;
+	struct input_event out[MAX_EV];
+	size_t k = 0;
+	for (size_t i = 0; i < n / sz; i++) {
+		const struct input_event *e = &in[i];
+		bool btn = e->type == EV_KEY && e->code >= BTN_LEFT && e->code <= BTN_TASK && (e->value == 0 || e->value == 1);
+		struct click *c = btn ? click_slot(fd, e->code) : NULL;
+		if (c && e->value == 1) {
+			if (c->pending) {
+				if (k) real_wr(fd, out, k * sz);
+				k = 0;
+				release_now(c);
+			}
+			c->down = now_ms();
+		} else if (c && c->down && now_ms() - c->down < click_min() && defer_release(c)) {
+			c->down = 0;
+			continue;
+		} else if (c) {
+			c->down = 0;
+		}
+		out[k++] = *e;
+	}
+	ssize_t rc = k ? real_wr(fd, out, k * sz) : 0;
 	pthread_mutex_unlock(&click_lock);
-	return rc;
+	return rc < 0 ? rc : (ssize_t)n;
 }
 
 void libevdev_uinput_destroy(struct libevdev_uinput *u) {
 	static void (*real)(struct libevdev_uinput *);
 	if (!real) real = dlsym(RTLD_NEXT, "libevdev_uinput_destroy");
 	pthread_mutex_lock(&click_lock);
-	for (int i = 0; i < MAX_CLICK; i++)
-		if (clicks[i].u == u) clicks[i] = (struct click){.gen = clicks[i].gen + 1};
+	for (int i = 0; i < MAX_DEV; i++) {
+		if (ufds[i].u != u) continue;
+		for (int k = 0; k < MAX_CLICK; k++)
+			if (clicks[k].fd == ufds[i].fd + 1) clicks[k] = (struct click){.gen = clicks[k].gen + 1};
+		ufds[i].u = NULL;
+		nufds--;
+	}
 	pthread_mutex_unlock(&click_lock);
 	pthread_mutex_lock(&pub_lock);
 	for (int i = 0; i < MAX_DEV; i++) {

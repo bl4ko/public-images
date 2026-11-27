@@ -1,4 +1,4 @@
-FROM docker.io/library/ubuntu:noble@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289
+FROM docker.io/library/ubuntu:noble@sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b
 ARG FLUTTER_VERSION=3.47.7
 LABEL org.opencontainers.image.source=https://github.com/bl4ko/public-images
 RUN apt-get -o Acquire::Retries=3 update \

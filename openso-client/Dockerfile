@@ -39,7 +39,7 @@ FROM docker.io/library/ubuntu:26.04@sha256:d66b366dac61b575bee2aef07e9c26e807009
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     sway \

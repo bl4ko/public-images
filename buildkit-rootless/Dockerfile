@@ -44,8 +44,8 @@ RUN rm -rf vendor && \
 
 FROM gobuild AS rootlesskit
 # renovate-commit: datasource=github-tags depName=rootless-containers/rootlesskit
-ARG ROOTLESSKIT_VERSION=v3.2.0
-ARG ROOTLESSKIT_COMMIT=f0cc012b20fd6039fc0b73e83051a521a4690a2e
+ARG ROOTLESSKIT_VERSION=v3.3.0
+ARG ROOTLESSKIT_COMMIT=888c3189e9cdf34dcdb19011e1c7c34eb94b5393
 ADD --keep-git-dir=true --checksum=${ROOTLESSKIT_COMMIT} https://github.com/rootless-containers/rootlesskit.git?ref=${ROOTLESSKIT_VERSION} /src
 WORKDIR /src
 ARG TARGETPLATFORM
